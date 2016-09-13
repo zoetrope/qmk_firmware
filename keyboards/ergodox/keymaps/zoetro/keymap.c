@@ -1,6 +1,7 @@
-#include "ergodox_ez.h"
+#include "ergodox.h"
 #include "debug.h"
 #include "action_layer.h"
+#include "version.h"
 
 // Layers
 #define BASE 0 // default layer
