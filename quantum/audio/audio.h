@@ -1,3 +1,6 @@
+#ifndef AUDIO_H
+#define AUDIO_H
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <avr/io.h>
@@ -5,9 +8,7 @@
 #include "musical_notes.h"
 #include "song_list.h"
 #include "voices.h"
-
-#ifndef AUDIO_H
-#define AUDIO_H
+#include "quantum.h"
 
 // Largely untested PWM audio mode (doesn't sound as good)
 // #define PWM_AUDIO
@@ -86,9 +87,5 @@ void play_notes(float (*np)[][2], uint16_t n_count, bool n_repeat, float n_rest)
 
 
 bool is_playing_notes(void);
-void play_goodbye_tone(void);
-void play_startup_tone(void);
-
-
 
 #endif

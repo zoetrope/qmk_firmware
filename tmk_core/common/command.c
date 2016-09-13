@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <stdint.h>
 #include <stdbool.h>
-#include <util/delay.h>
+#include "wait.h"
 #include "keycode.h"
 #include "host.h"
 #include "keymap.h"
@@ -33,20 +33,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "led.h"
 #include "command.h"
 #include "backlight.h"
+#include "quantum.h"
+#include "version.h"
 
 #ifdef MOUSEKEY_ENABLE
 #include "mousekey.h"
 #endif
 
 #ifdef PROTOCOL_PJRC
-#   include "usb_keyboard.h"
-#   ifdef EXTRAKEY_ENABLE
-#       include "usb_extra.h"
-#   endif
+	#include "usb_keyboard.h"
+		#ifdef EXTRAKEY_ENABLE
+		#include "usb_extra.h"
+	#endif
 #endif
 
 #ifdef PROTOCOL_VUSB
-#   include "usbdrv.h"
+	#include "usbdrv.h"
 #endif
 
 #ifdef AUDIO_ENABLE
@@ -65,7 +67,6 @@ static bool mousekey_console(uint8_t code);
 static void mousekey_console_help(void);
 #endif
 
-static uint8_t numkey2num(uint8_t code);
 static void switch_default_layer(uint8_t layer);
 
 
@@ -103,12 +104,14 @@ bool command_proc(uint8_t code)
 bool command_extra(uint8_t code) __attribute__ ((weak));
 bool command_extra(uint8_t code)
 {
+    (void)code;
     return false;
 }
 
 bool command_console_extra(uint8_t code) __attribute__ ((weak));
 bool command_console_extra(uint8_t code)
 {
+    (void)code;
     return false;
 }
 
@@ -178,7 +181,7 @@ static void print_version(void)
     print("VID: " STR(VENDOR_ID) "(" STR(MANUFACTURER) ") "
           "PID: " STR(PRODUCT_ID) "(" STR(PRODUCT) ") "
           "VER: " STR(DEVICE_VER) "\n");
-    print("BUILD: " STR(VERSION) " (" __TIME__ " " __DATE__ ")\n");
+    print("BUILD: " STR(QMK_VERSION) " (" __TIME__ " " __DATE__ ")\n");
 
     /* build options */
     print("OPTIONS:"
@@ -217,8 +220,11 @@ static void print_version(void)
 	    " " STR(BOOTLOADER_SIZE) "\n");
 
     print("GCC: " STR(__GNUC__) "." STR(__GNUC_MINOR__) "." STR(__GNUC_PATCHLEVEL__)
+#if defined(__AVR__)
           " AVR-LIBC: " __AVR_LIBC_VERSION_STRING__
-          " AVR_ARCH: avr" STR(__AVR_ARCH__) "\n");
+          " AVR_ARCH: avr" STR(__AVR_ARCH__)
+#endif
+		  "\n");
 
 	return;
 }
@@ -232,9 +238,9 @@ static void print_status(void)
     print_val_hex8(keyboard_protocol);
     print_val_hex8(keyboard_idle);
 #ifdef NKRO_ENABLE
-    print_val_hex8(keyboard_nkro);
+    print_val_hex8(keymap_config.nkro);
 #endif
-    print_val_hex32(timer_count);
+    print_val_hex32(timer_read32());
 
 #ifdef PROTOCOL_PJRC
     print_val_hex8(UDCON);
@@ -358,9 +364,9 @@ static bool command_common(uint8_t code)
             print("\n\nJumping to bootloader... ");
             #ifdef AUDIO_ENABLE
 	            stop_all_notes();
-                play_goodbye_tone();
+                shutdown_user();
             #else
-	            _delay_ms(1000);
+	            wait_ms(1000);
             #endif
             bootloader_jump(); // not return
             break;
@@ -429,11 +435,12 @@ static bool command_common(uint8_t code)
 		// NKRO toggle
         case MAGIC_KC(MAGIC_KEY_NKRO):
             clear_keyboard(); // clear to prevent stuck keys
-            keyboard_nkro = !keyboard_nkro;
-            if (keyboard_nkro)
+            keymap_config.nkro = !keymap_config.nkro;
+            if (keymap_config.nkro) {
                 print("NKRO: on\n");
-            else
+            } else {
                 print("NKRO: off\n");
+            }
             break;
 #endif
 
@@ -750,10 +757,11 @@ static bool mousekey_console(uint8_t code)
             print("?");
             return false;
     }
-    if (mousekey_param)
+    if (mousekey_param) {
         xprintf("M%d> ", mousekey_param);
-    else
+    } else {
         print("M>" );
+    }
     return true;
 }
 #endif
@@ -762,7 +770,7 @@ static bool mousekey_console(uint8_t code)
 /***********************************************************
  * Utilities
  ***********************************************************/
-static uint8_t numkey2num(uint8_t code)
+uint8_t numkey2num(uint8_t code)
 {
     switch (code) {
         case KC_1: return 1;
