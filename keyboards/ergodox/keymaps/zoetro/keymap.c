@@ -11,17 +11,18 @@
 
 // Macros
 #define M_KILL 1 // kill lines
+#define M_MESC 2 // IME off & Esc
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 /* Keymap 0: Basic layer
  *
  * ,--------------------------------------------------.           ,--------------------------------------------------.
- * | `~     |  1!  |  2@  |  3#  |  4$  |  5%  |  L1  |           | RIGHT|  6^  |  7&  |  8*  |  9(  |  0)  |   -_   |
+ * | `~     |  1!  |  2@  |  3#  |  4$  |  5%  | MDIA |           | RIGHT|  6^  |  7&  |  8*  |  9(  |  0)  |   -_   |
  * |--------+------+------+------+------+-------------|           |------+------+------+------+------+------+--------|
- * | Tab    |   Q  |   W  |   E  |   R  |   T  |  L2  |           |  L3  |   Y  |   U  |   I  |   O  |   P  |   =    |
+ * | Tab    |   Q  |   W  |   E  |   R  |   T  | MHEN |           | HENK |   Y  |   U  |   I  |   O  |   P  |   =    |
  * |--------+------+------+------+------+------|      |           |      |------+------+------+------+------+--------|
  * | Ctrl   |   A  |   S  |   D  |   F  |   G  |------|           |------|   H  |   J  |   K  |   L  |  ;:  |   '"   |
- * |--------+------+------+------+------+------| MHEN |           | HENK |------+------+------+------+------+--------|
+ * |--------+------+------+------+------+------| SYMB |           | SYMB |------+------+------+------+------+--------|
  * | LShift |   Z  |   X  |   C  |   V  |   B  |      |           |      |   N  |   M  |   <, |   >. |  /?  |   \|   |
  * `--------+------+------+------+------+-------------'           `-------------+------+------+------+------+--------'
  *   | Ctrl |  GUI |  Alt | Left | Right|                                       |  Up  | Down |   [  |   ]  | Enter|
@@ -30,7 +31,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
  *                                        | App  | LGui |       | Bspc | Delete |
  *                                 ,------|------|------|       |------+--------+------.
  *                                 | Space|      | Home |       | PgUp |        | Esc  |
- *                                 | ~EMCS|Space |------|       |------|  Enter | ~SYMB|
+ *                                 | ~EMCS|Space |------|       |------|  Enter | &MHEN|
  *                                 |      |      | End  |       | PgDn |        |      |
  *                                 `--------------------'       `----------------------'
  */
@@ -38,23 +39,23 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 // Otherwise, it needs KC_*
 [BASE] = KEYMAP(  // layer 0 : default
         // left hand
-        KC_GRV,         KC_1,         KC_2,   KC_3,   KC_4,   KC_5,    TG(SYMB),
-        KC_TAB,         KC_Q,         KC_W,   KC_E,   KC_R,   KC_T,    TG(MDIA),
+        KC_GRV,         KC_1,         KC_2,   KC_3,   KC_4,   KC_5,    TG(MDIA),
+        KC_TAB,         KC_Q,         KC_W,   KC_E,   KC_R,   KC_T,    KC_MHEN,
         KC_LCTL,        KC_A,         KC_S,   KC_D,   KC_F,   KC_G,
-        KC_LSFT,        KC_Z,         KC_X,   KC_C,   KC_V,   KC_B,    KC_MHEN,
+        KC_LSFT,        KC_Z,         KC_X,   KC_C,   KC_V,   KC_B,    MO(SYMB),
         KC_LCTL,     KC_LGUI,      KC_LALT,KC_LEFT,   KC_RIGHT,
                                               ALT_T(KC_APP),  KC_LGUI,
                                                               KC_HOME,
                                               MO(EMCS), KC_SPC, KC_END,
         // right hand
              KC_RGHT,     KC_6,   KC_7,   KC_8,   KC_9,   KC_0,             KC_MINS,
-             TG(EMCS),    KC_Y,   KC_U,   KC_I,   KC_O,   KC_P,             KC_EQL,
+             KC_HENK,     KC_Y,   KC_U,   KC_I,   KC_O,   KC_P,             KC_EQL,
                           KC_H,   KC_J,   KC_K,   KC_L,   KC_SCLN,          KC_QUOT,
-             KC_HENK,     KC_N,   KC_M,   KC_COMM,KC_DOT, KC_SLSH,          KC_BSLS,
+             MO(SYMB),    KC_N,   KC_M,   KC_COMM,KC_DOT, KC_SLSH,          KC_BSLS,
                                   KC_UP,  KC_DOWN,KC_LBRC,KC_RBRC,          KC_ENT,
              KC_BSPC,        KC_DEL,
              KC_PGUP,
-             KC_PGDN,KC_ENT, LT(SYMB, KC_ESC)
+             KC_PGDN,KC_ENT, M(M_MESC)
     ),
 /* Keymap 1: Symbol Layer
  *
@@ -200,6 +201,11 @@ const macro_t *action_get_macro(keyrecord_t *record, uint8_t id, uint8_t opt)
         case M_KILL:
         if (record->event.pressed) {
           return MACRO(D(LSFT), T(END), U(LSFT), W(100), D(LSFT), T(DEL), U(LSFT), END);
+        }
+        break;
+        case M_MESC:
+        if (record->event.pressed) {
+          return MACRO(T(MHEN), W(100), T(ESC), END);
         }
         break;
       }
