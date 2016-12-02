@@ -72,9 +72,11 @@ Here are the steps
 3. If you are going to flash Infinity based keyboards you will need to install dfu-util, refer to the instructions by [Input Club](https://github.com/kiibohd/controller/wiki/Loading-DFU-Firmware).
 4. Install [MinGW](https://sourceforge.net/projects/mingw/files/Installer/mingw-get-setup.exe/download). During installation, uncheck the option to install a graphical user interface. **DO NOT change the default installation folder.** The scripts depend on the default location.
 5. Clone this repository. [This link will download it as a zip file, which you'll need to extract.](https://github.com/jackhumbert/qmk_firmware/archive/master.zip) Open the extracted folder in Windows Explorer.
-6. Double-click on the 1-setup-path-win batch script to run it. You'll need to accept a User Account Control prompt. Press the spacebar to dismiss the success message in the command prompt that pops up.
-7. Right-click on the 2-setup-environment-win batch script, select "Run as administrator", and accept the User Account Control prompt. This part may take a couple of minutes, and you'll need to approve a driver installation, but once it finishes, your environment is complete!
-8. Future build commands should be run from the MHV AVR Shell, which sets up an environment compatible with colorful build output. The standard Command Prompt will also work, but add `COLOR=false` to the end of all make commands when using it.
+6. Open the `\util` folder.
+7. Double-click on the `1-setup-path-win` batch script to run it. You'll need to accept a User Account Control prompt. Press the spacebar to dismiss the success message in the command prompt that pops up.
+8. Right-click on the `2-setup-environment-win` batch script, select "Run as administrator", and accept the User Account Control prompt. This part may take a couple of minutes, and you'll need to approve a driver installation, but once it finishes, your environment is complete!
+
+If you have trouble and want to ask for help, it is useful to generate a *Win_Check_Output.txt* file by running `Win_Check.bat` in the `\util` folder.
 
 ### Mac
 If you're using [homebrew,](http://brew.sh/) you can use the following commands:
@@ -137,6 +139,9 @@ If this is a bit complex for you, Docker might be the turn-key solution you need
 # defaults are ergodox/default
 
 docker run -e keymap=gwen -e keyboard=ergodox --rm -v $('pwd'):/qmk:rw edasque/qmk_firmware
+
+# On windows docker seems to have issue with VOLUME tag in Dockerfile, and $('pwd') won't print a windows compliant path, use full path instead like this
+docker run -e keymap=default -e keyboard=ergobop --rm -v D:/Users/Sacapuces/Documents/Repositories/qmk:/qmk:rw edasque/qmk_firmware
 
 ```
 
@@ -236,6 +241,7 @@ You can also add extra options at the end of the make command line, after the ta
 * `make COLOR=false` - turns off color output
 * `make SILENT=true` - turns off output besides errors/warnings
 * `make VERBOSE=true` - outputs all of the gcc stuff (not interesting, unless you need to debug)
+* `make EXTRAFLAGS=-E` - Preprocess the code without doing any compiling (useful if you are trying to debug #define commands)
 
 The make command itself also has some additional options, type `make --help` for more information. The most useful is probably `-jx`, which specifies that you want to compile using more than one CPU, the `x` represents the number of CPUs that you want to use. Setting that can greatly reduce the compile times, especially if you are compiling many keyboards/keymaps. I usually set it to one less than the number of CPUs that I have, so that I have some left for doing other things while it's compiling. Note that not all operating systems and make versions supports that option.
 
@@ -278,11 +284,23 @@ This allows you to use the system and audio control key codes.
 
 `CONSOLE_ENABLE`
 
-This allows you to print messages that can be read using [`hid_listen`](https://www.pjrc.com/teensy/hid_listen.html). Add this to your `Makefile`, and set it to `yes`. Then put `println`, `printf`, etc. in your keymap or anywhere in the `qmk` source. Finally, open `hid_listen` and enjoy looking at your printed messages.
+This allows you to print messages that can be read using [`hid_listen`](https://www.pjrc.com/teensy/hid_listen.html). 
+
+By default, all debug (*dprint*) print (*print*, *xprintf*), and user print (*uprint*) messages will be enabled. This will eat up a significant portion of the flash and may make the keyboard .hex file too big to program. 
+
+To disable debug messages (*dprint*) and reduce the .hex file size, include `#define NO_DEBUG` in your `config.h` file.
+
+To disable print messages (*print*, *xprintf*) and user print messages (*uprint*) and reduce the .hex file size, include `#define NO_PRINT` in your `config.h` file.
+
+To disable print messages (*print*, *xprintf*) and **KEEP** user print messages (*uprint*), include `#define USER_PRINT` in your `config.h` file.
+
+To see the text, open `hid_listen` and enjoy looking at your printed messages.
+
+**NOTE:** Do not include *uprint* messages in anything other than your keymap code. It must not be used within the QMK system framework. Otherwise, you will bloat other people's .hex files. 
 
 `COMMAND_ENABLE`
 
-TODO
+This enables magic commands, typically fired with the default magic key combo `LSHIFT+RSHIFT+KEY`. Magic commands include turning on debugging messages (`MAGIC+D`) or temporarily toggling NKRO (`MAGIC+N`).
 
 `SLEEP_LED_ENABLE`
 
@@ -290,7 +308,7 @@ Enables your LED to breath while your computer is sleeping. Timer1 is being used
 
 `NKRO_ENABLE`
 
-This allows for n-key rollover (default is 6) to be enabled. It is off by default, but can be forced by adding `#define FORCE_NKRO` to your config.h.
+This allows the keyboard to tell the host OS that up to 248 keys are held down at once (default without NKRO is 6). NKRO is off by default, even if `NKRO_ENABLE` is set. NKRO can be forced by adding `#define FORCE_NKRO` to your config.h or by binding `MAGIC_TOGGLE_NKRO` to a key and then hitting the key.
 
 `BACKLIGHT_ENABLE`
 
@@ -306,6 +324,18 @@ This enables MIDI sending and receiving with your keyboard. To enter MIDI send m
 
 This allows you to send unicode symbols via `UC(<unicode>)` in your keymap. Only codes up to 0x7FFF are currently supported.
 
+`UNICODEMAP_ENABLE`
+
+This allows sending unicode symbols using `X(<unicode>)` in your keymap. Codes
+up to 0xFFFFFFFF are supported, including emojis. You will need to maintain
+a separate mapping table in your keymap file.
+
+Known limitations:
+- Under Mac OS, only codes up to 0xFFFF are supported.
+- Under Linux ibus, only codes up to 0xFFFFF are supported (but anything important is still under this limit for now).
+
+Characters out of range supported by the OS will be ignored.
+
 `BLUETOOTH_ENABLE`
 
 This allows you to interface with a Bluefruit EZ-key to send keycodes wirelessly. It uses the D2 and D3 pins.
@@ -313,6 +343,10 @@ This allows you to interface with a Bluefruit EZ-key to send keycodes wirelessly
 `AUDIO_ENABLE`
 
 This allows you output audio on the C6 pin (needs abstracting). See the [audio section](#driving-a-speaker---audio-support) for more information.
+
+`VARIABLE_TRACE`
+
+Use this to debug changes to variable values, see the [tracing variables](#tracing-variables) section for more information.
 
 ### Customizing Makefile options on a per-keymap basis
 
@@ -361,6 +395,8 @@ Instead of using `FNx` when defining `ACTION_*` functions, you can use `F(x)` - 
 `LT(layer, kc)` - momentary switch to *layer* when held, and *kc* when tapped. Like `MO()`, this only works upwards in the layer stack (`layer` must be higher than the current layer).
 
 `TG(layer)` - toggles a layer on or off. As with `MO()`, you should set this key as `KC_TRNS` in the destination layer so that tapping it again actually toggles back to the original layer. Only works upwards in the layer stack.
+
+`TO(layer)` - Goes to a layer. This code is special, because it lets you go either up or down the stack -- just goes directly to the layer you want. So while other codes only let you go _up_ the stack (from layer 0 to layer 3, for example), `TO(2)` is going to get you to layer 2, no matter where you activate it from -- even if you're currently on layer 5. This gets activated on keydown (as soon as the key is pressed).
 
 
 ### Fun with modifier keys
@@ -512,7 +548,7 @@ This array specifies what actions shall be taken when a tap-dance key is in acti
 
 * `ACTION_TAP_DANCE_DOUBLE(kc1, kc2)`: Sends the `kc1` keycode when tapped once, `kc2` otherwise. When the key is held, the appropriate keycode is registered: `kc1` when pressed and held, `kc2` when tapped once, then pressed and held.
 * `ACTION_TAP_DANCE_FN(fn)`: Calls the specified function - defined in the user keymap - with the final tap count of the tap dance action.
-* `ACTION_TAP_DANCE_FN_ADVANCED(on_each_tap_fn, on_dance_finished_fn, on_reset_fn)`: Calls the first specified function - defined in the user keymap - on every tap, the second function on when the dance action finishes (like the previous option), and the last function when the tap dance action resets.
+* `ACTION_TAP_DANCE_FN_ADVANCED(on_each_tap_fn, on_dance_finished_fn, on_dance_reset_fn)`: Calls the first specified function - defined in the user keymap - on every tap, the second function on when the dance action finishes (like the previous option), and the last function when the tap dance action resets.
 
 The first option is enough for a lot of cases, that just want dual roles. For example, `ACTION_TAP_DANCE(KC_SPC, KC_ENT)` will result in `Space` being sent on single-tap, `Enter` otherwise.
 
@@ -809,7 +845,7 @@ And then, to assign this macro to a key on your keyboard layout, you just use `M
 
 ## Dynamic macros: record and replay macros in runtime
 
-In addition to the static macros described above, you may enable the dynamic macros which you may record while writing. They are forgotten as soon as the keyboard is unplugged. Only two such macros may be stored at the same time, with the total length of 128 keypresses.
+In addition to the static macros described above, you may enable the dynamic macros which you may record while writing. They are forgotten as soon as the keyboard is unplugged. Only two such macros may be stored at the same time, with the total length of 64 keypresses (by default).
 
 To enable them, first add a new element to the `planck_keycodes` enum -- `DYNAMIC_MACRO_RANGE`:
 
@@ -850,7 +886,7 @@ Add the following code to the very beginning of your `process_record_user()` fun
 
 To start recording the macro, press either `DYN_REC_START1` or `DYN_REC_START2`. To finish the recording, press the `_DYN` layer button. The handler awaits specifically for the `MO(_DYN)` keycode as the "stop signal" so please don't use any fancy ways to access this layer, use the regular `MO()` modifier. To replay the macro, press either `DYN_MACRO_PLAY1` or `DYN_MACRO_PLAY2`.
 
-If the LED-s start blinking during the recording with each keypress, it means there is no more space for the macro in the macro buffer. To fit the macro in, either make the other macro shorter (they share the same buffer) or increase the buffer size by setting the `DYNAMIC_MACRO_SIZE` preprocessor macro (default value: 256; please read the comments for it in the header).
+If the LED-s start blinking during the recording with each keypress, it means there is no more space for the macro in the macro buffer. To fit the macro in, either make the other macro shorter (they share the same buffer) or increase the buffer size by setting the `DYNAMIC_MACRO_SIZE` preprocessor macro (default value: 128; please read the comments for it in the header).
 
 For the details about the internals of the dynamic macros, please read the comments in the `dynamic_macro.h` header.
 
@@ -875,7 +911,33 @@ In `quantum/keymap_extras/`, you'll see various language files - these work the 
 
 ## Unicode support
 
-You can currently send 4 hex digits with your OS-specific modifier key (RALT for OSX with the "Unicode Hex Input" layout) - this is currently limited to supporting one OS at a time, and requires a recompile for switching. 8 digit hex codes are being worked on. The keycode function is `UC(n)`, where *n* is a 4 digit hexidecimal. Enable from the Makefile.
+There are three Unicode keymap definition method available in QMK:
+
+### UNICODE_ENABLE
+
+Supports Unicode input up to 0xFFFF. The keycode function is `UC(n)` in
+keymap file, where *n* is a 4 digit hexadecimal.
+
+### UNICODEMAP_ENABLE
+
+Supports Unicode up to 0xFFFFFFFF. You need to maintain a separate mapping
+table `const uint32_t PROGMEM unicode_map[] = {...}` in your keymap file.
+The keycode function is `X(n)` where *n* is the array index of the mapping
+table.
+
+### UCIS_ENABLE
+
+TBD
+
+Unicode input in QMK works by inputing a sequence of characters to the OS,
+sort of like macro. Unfortunately, each OS has different ideas on how Unicode is inputted.
+
+This is the current list of Unicode input method in QMK:
+
+* UC_OSX: MacOS Unicode Hex Input support. Works only up to 0xFFFF. Disabled by default. To enable: go to System Preferences -> Keyboard -> Input Sources, and enable Unicode Hex.
+* UC_LNX: Unicode input method under Linux. Works up to 0xFFFFF. Should work almost anywhere on ibus enabled distros. Without ibus, this works under GTK apps, but rarely anywhere else.
+* UC_WIN: (not recommended) Windows built-in Unicode input. To enable: create registry key under `HKEY_CURRENT_USER\Control Panel\Input Method\EnableHexNumpad` of type `REG_SZ` called `EnableHexNumpad`, set its value to 1, and reboot. This method is not recommended because of reliability and compatibility issue, use WinCompose method below instead.
+* UC_WINC: Windows Unicode input using WinCompose. Requires [WinCompose](https://github.com/samhocevar/wincompose). Works reliably under many (all?) variations of Windows.
 
 ## Backlight Breathing
 
@@ -1100,12 +1162,12 @@ For this mod, you need an unused pin wiring to DI of WS2812 strip. After wiring 
 
     RGBLIGHT_ENABLE = yes
 
-In order to use the underglow timer functions, you need to have `#define RGBLIGHT_TIMER` in your `config.h`, and have audio disabled (`AUDIO_ENABLE = no` in your Makefile).
+In order to use the underglow animation functions, you need to have `#define RGBLIGHT_ANIMATIONS` in your `config.h`.
 
 Please add the following options into your config.h, and set them up according your hardware configuration. These settings are for the `F4` pin by default:
 
     #define RGB_DI_PIN F4     // The pin your RGB strip is wired to
-    #define RGBLIGHT_TIMER    // Require for fancier stuff (not compatible with audio)
+    #define RGBLIGHT_ANIMATIONS    // Require for fancier stuff (not compatible with audio)
     #define RGBLED_NUM 14     // Number of LEDs
     #define RGBLIGHT_HUE_STEP 10
     #define RGBLIGHT_SAT_STEP 17
@@ -1120,6 +1182,135 @@ The firmware supports 5 different light effects, and the color (hue, saturation,
 ![WS2812 Wiring](https://raw.githubusercontent.com/jackhumbert/qmk_firmware/master/keyboards/planck/keymaps/yang/WS2812-wiring.jpg)
 
 Please note the USB port can only supply a limited amount of power to the keyboard (500mA by standard, however, modern computer and most usb hubs can provide 700+mA.). According to the data of NeoPixel from Adafruit, 30 WS2812 LEDs require a 5V 1A power supply, LEDs used in this mod should not more than 20.
+
+## PS/2 Mouse Support
+
+Its possible to hook up a PS/2 mouse (for example touchpads or trackpoints) to your keyboard as a composite device.
+
+Then, decide whether to use USART (best), interrupts (better) or busywait (not recommended), and enable the relevant option.
+
+### Busywait version
+
+Note: This is not recommended, you may encounter jerky movement or unsent inputs. Please use interrupt or USART version if possible.
+
+In rules.mk:
+
+```
+PS2_MOUSE_ENABLE = yes
+PS2_USE_BUSYWAIT = yes
+```
+
+In your keyboard config.h:
+
+```
+#ifdef PS2_USE_BUSYWAIT
+#   define PS2_CLOCK_PORT  PORTD
+#   define PS2_CLOCK_PIN   PIND
+#   define PS2_CLOCK_DDR   DDRD
+#   define PS2_CLOCK_BIT   1
+#   define PS2_DATA_PORT   PORTD
+#   define PS2_DATA_PIN    PIND
+#   define PS2_DATA_DDR    DDRD
+#   define PS2_DATA_BIT    2
+#endif
+```
+
+### Interrupt version
+
+The following example uses D2 for clock and D5 for data. You can use any INT or PCINT pin for clock, and any pin for data.
+
+In rules.mk:
+
+```
+PS2_MOUSE_ENABLE = yes
+PS2_USE_INT = yes
+```
+
+In your keyboard config.h:
+
+```
+#ifdef PS2_USE_INT
+#define PS2_CLOCK_PORT  PORTD
+#define PS2_CLOCK_PIN   PIND
+#define PS2_CLOCK_DDR   DDRD
+#define PS2_CLOCK_BIT   2
+#define PS2_DATA_PORT   PORTD
+#define PS2_DATA_PIN    PIND
+#define PS2_DATA_DDR    DDRD
+#define PS2_DATA_BIT    5
+
+#define PS2_INT_INIT()  do {    \
+    EICRA |= ((1<<ISC21) |      \
+              (0<<ISC20));      \
+} while (0)
+#define PS2_INT_ON()  do {      \
+    EIMSK |= (1<<INT2);         \
+} while (0)
+#define PS2_INT_OFF() do {      \
+    EIMSK &= ~(1<<INT2);        \
+} while (0)
+#define PS2_INT_VECT   INT2_vect
+#endif
+```
+
+### USART version
+
+To use USART on the ATMega32u4, you have to use PD5 for clock and PD2 for data. If one of those are unavailable, you need to use interrupt version.
+
+In rules.mk:
+
+```
+PS2_MOUSE_ENABLE = yes
+PS2_USE_USART = yes
+```
+
+In your keyboard config.h:
+
+```
+#ifdef PS2_USE_USART
+#define PS2_CLOCK_PORT  PORTD
+#define PS2_CLOCK_PIN   PIND
+#define PS2_CLOCK_DDR   DDRD
+#define PS2_CLOCK_BIT   5
+#define PS2_DATA_PORT   PORTD
+#define PS2_DATA_PIN    PIND
+#define PS2_DATA_DDR    DDRD
+#define PS2_DATA_BIT    2
+
+/* synchronous, odd parity, 1-bit stop, 8-bit data, sample at falling edge */
+/* set DDR of CLOCK as input to be slave */
+#define PS2_USART_INIT() do {   \
+    PS2_CLOCK_DDR &= ~(1<<PS2_CLOCK_BIT);   \
+    PS2_DATA_DDR &= ~(1<<PS2_DATA_BIT);     \
+    UCSR1C = ((1 << UMSEL10) |  \
+              (3 << UPM10)   |  \
+              (0 << USBS1)   |  \
+              (3 << UCSZ10)  |  \
+              (0 << UCPOL1));   \
+    UCSR1A = 0;                 \
+    UBRR1H = 0;                 \
+    UBRR1L = 0;                 \
+} while (0)
+#define PS2_USART_RX_INT_ON() do {  \
+    UCSR1B = ((1 << RXCIE1) |       \
+              (1 << RXEN1));        \
+} while (0)
+#define PS2_USART_RX_POLL_ON() do { \
+    UCSR1B = (1 << RXEN1);          \
+} while (0)
+#define PS2_USART_OFF() do {    \
+    UCSR1C = 0;                 \
+    UCSR1B &= ~((1 << RXEN1) |  \
+                (1 << TXEN1));  \
+} while (0)
+#define PS2_USART_RX_READY      (UCSR1A & (1<<RXC1))
+#define PS2_USART_RX_DATA       UDR1
+#define PS2_USART_ERROR         (UCSR1A & ((1<<FE1) | (1<<DOR1) | (1<<UPE1)))
+#define PS2_USART_RX_VECT       USART1_RX_vect
+#endif
+#endif
+#endif
+```
 
 ## Safety Considerations
 
@@ -1252,3 +1443,22 @@ If there are problems with the tests, you can find the executable in the `./buil
 It's not yet possible to do a full integration test, where you would compile the whole firmware and define a keymap that you are going to test. However there are plans for doing that, because writing tests that way would probably be easier, at least for people that are not used to unit testing.
 
 In that model you would emulate the input, and expect a certain output from the emulated keyboard.
+
+# Tracing variables 
+
+Sometimes you might wonder why a variable gets changed and where, and this can be quite tricky to track down without having a debugger. It's of course possible to manually add print statements to track it, but you can also enable the variable trace feature. This works for both for variables that are changed by the code, and when the variable is changed by some memory corruption.
+
+To take the feature into use add `VARIABLE_TRACE=x` to the end of you make command. `x` represents the number of variables you want to trace, which is usually 1. 
+
+Then at a suitable place in the code, call `ADD_TRACED_VARIABLE`, to begin the tracing. For example to trace all the layer changes, you can do this
+```c
+void matrix_init_user(void) {
+  ADD_TRACED_VARIABLE("layer", &layer_state, sizeof(layer_state));
+}
+```
+
+This will add a traced variable named "layer" (the name is just for your information), which tracks the memory location of `layer_state`. It tracks 4 bytes (the size of `layer_state`), so any modification to the variable will be reported. By default you can not specify a size bigger than 4, but you can change it by adding `MAX_VARIABLE_TRACE_SIZE=x` to the end of the make command line.
+
+In order to actually detect changes to the variables you should call `VERIFY_TRACED_VARIABLES` around the code that you think that modifies the variable. If a variable is modified it will tell you between which two `VERIFY_TRACED_VARIABLES` calls the modification happened. You can then add more calls to track it down further. I don't recommend spamming the codebase with calls. It's better to start with a few, and then keep adding them in a binary search fashion. You can also delete the ones you don't need, as each call need to store the file name and line number in the ROM, so you can run out of memory if you add too many calls.
+
+Also remember to delete all the tracing code ones you have found the bug, as you wouldn't want to create a pull request with tracing code.
